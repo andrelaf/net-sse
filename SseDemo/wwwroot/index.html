@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSE Demo — .NET 10</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header { text-align: center; margin-bottom: 2.5rem; }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p { margin-top: .5rem; color: #64748b; font-size: .95rem; }
+
+    header code {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 4px;
+      padding: .1em .4em;
+      font-size: .85em;
+      color: #a78bfa;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: .2em .6em;
+      border-radius: 999px;
+      background: #7c3aed22;
+      color: #a78bfa;
+      border: 1px solid #7c3aed44;
+    }
+
+    .api-note {
+      font-size: .75rem;
+      color: #4b5563;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      border-left: 2px solid #2d3148;
+      padding-left: .6rem;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px #4ade80;
+      animation: pulse 1.5s infinite;
+      display: none;
+      flex-shrink: 0;
+    }
+    .status-dot.active { display: inline-block; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+    .controls { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+    button {
+      padding: .45rem 1rem;
+      border-radius: 8px;
+      border: none;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-start { background: linear-gradient(135deg, #7c3aed, #3b82f6); color: #fff; }
+    .btn-stop  { background: #374151; color: #e2e8f0; }
+
+    .output {
+      background: #0b0e18;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+      padding: .75rem;
+      min-height: 110px;
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: .78rem;
+      line-height: 1.65;
+      color: #94a3b8;
+    }
+
+    /* ── Clock ── */
+    .clock-display {
+      text-align: center;
+      padding: 1rem;
+      background: #0b0e18;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+    }
+    .clock-time {
+      font-size: 3rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #7c3aed;
+      text-shadow: 0 0 24px #7c3aed55;
+      letter-spacing: .04em;
+    }
+    .clock-date { color: #4b5563; margin-top: .25rem; font-size: .82rem; text-transform: capitalize; }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      background: #0b0e18;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: .78rem;
+      color: #4b5563;
+      margin-bottom: .5rem;
+    }
+    .progress-bg { background: #1e2130; border-radius: 999px; height: 10px; overflow: hidden; }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #7c3aed, #3b82f6, #06b6d4);
+      transition: width .4s ease;
+      width: 0%;
+    }
+    .progress-step { margin-top: .6rem; font-size: .8rem; color: #64748b; min-height: 1.2em; }
+
+    /* ── Chat ── */
+    .chat-row { display: flex; gap: .5rem; }
+    .chat-row input {
+      flex: 1;
+      background: #0b0e18;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+      padding: .45rem .75rem;
+      color: #e2e8f0;
+      font-size: .875rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .chat-row input:focus { border-color: #7c3aed; }
+
+    .chat-bubble {
+      background: #0b0e18;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+      padding: .75rem;
+      min-height: 70px;
+      font-size: .875rem;
+      line-height: 1.7;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+    }
+
+    /* ── Log lines ── */
+    .log-line { display: flex; gap: .5rem; align-items: flex-start; }
+    .etag {
+      font-size: .67rem;
+      padding: .1em .45em;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+      margin-top: .18em;
+      flex-shrink: 0;
+    }
+    .t-tick      { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed33; }
+    .t-progress  { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f633; }
+    .t-complete  { background: #4ade8022; color: #4ade80; border: 1px solid #4ade8033; }
+    .t-token     { background: #06b6d422; color: #22d3ee; border: 1px solid #06b6d433; }
+    .t-done      { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b33; }
+    .t-error     { background: #ef444422; color: #f87171; border: 1px solid #ef444433; }
+    .t-info      { background: #6b728022; color: #9ca3af; border: 1px solid #6b728033; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Server-Sent Events — .NET 10</h1>
+  <p>Três demos de <code>TypedResults.ServerSentEvents&lt;T&gt;</code> e <code>SseFormatter</code> em ação</p>
+</header>
+
+<div class="grid">
+
+  <!-- ═══ CARD 1: Relógio ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>
+      <span class="status-dot" id="clock-dot"></span>
+      Relógio em Tempo Real
+      <span class="badge">TypedResults.ServerSentEvents</span>
+    </h2>
+    <p class="api-note">TypedResults.ServerSentEvents(ClockStream(ct), eventType: "tick")</p>
+
+    <div class="clock-display">
+      <div class="clock-time" id="clock-time">--:--:--</div>
+      <div class="clock-date" id="clock-date">aguardando conexão...</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-start" id="clock-start" onclick="startClock()">Conectar</button>
+      <button class="btn-stop"  id="clock-stop"  onclick="stopClock()" disabled>Desconectar</button>
+    </div>
+
+    <div class="output" id="clock-log">
+      <span style="color:#374151">// eventos SSE aparecem aqui</span>
+    </div>
+  </div>
+
+  <!-- ═══ CARD 2: Progresso ════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>
+      <span class="status-dot" id="progress-dot"></span>
+      Progresso com Múltiplos Event Types
+      <span class="badge">SseFormatter</span>
+    </h2>
+    <p class="api-note">SseFormatter.WriteAsync(ProgressStream(ct), body, ct)</p>
+    <p class="api-note">new SseItem&lt;string&gt;(data, eventType: "progress" | "complete")</p>
+
+    <div class="progress-wrap">
+      <div class="progress-meta">
+        <span id="progress-pct">0%</span>
+        <span>event: <b id="progress-etype" style="color:#a78bfa">—</b></span>
+      </div>
+      <div class="progress-bg">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-step" id="progress-step">Pronto para iniciar</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-start" id="progress-start" onclick="startProgress()">Iniciar</button>
+      <button class="btn-stop"  id="progress-stop"  onclick="stopProgress()" disabled>Cancelar</button>
+    </div>
+
+    <div class="output" id="progress-log">
+      <span style="color:#374151">// eventos "progress" e "complete" com SseItem&lt;T&gt;</span>
+    </div>
+  </div>
+
+  <!-- ═══ CARD 3: Chat ═════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>
+      <span class="status-dot" id="chat-dot"></span>
+      Chat — Streaming de Tokens
+      <span class="badge">SseFormatter</span>
+    </h2>
+    <p class="api-note">SseFormatter.WriteAsync(ChatStream(msg, ct), body, ct)</p>
+    <p class="api-note">new SseItem&lt;string&gt;(token, "token") | SseItem&lt;string&gt;("", "done")</p>
+
+    <div class="chat-row">
+      <input id="chat-input" type="text" placeholder="Digite sua pergunta..."
+             value="O que é SSE no .NET 10?" onkeydown="if(event.key==='Enter')startChat()" />
+      <button class="btn-start" id="chat-send" onclick="startChat()">Enviar</button>
+    </div>
+
+    <div class="chat-bubble" id="chat-bubble">
+      <span style="color:#374151">A resposta aparece aqui, token a token...</span>
+    </div>
+
+    <div class="output" id="chat-log">
+      <span style="color:#374151">// tokens raw do event stream</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function addLog(id, type, text) {
+    const el  = document.getElementById(id);
+    const cls = { tick:'t-tick', progress:'t-progress', complete:'t-complete',
+                  token:'t-token', done:'t-done', error:'t-error', info:'t-info' }[type] ?? 't-info';
+    const d   = document.createElement('div');
+    d.className = 'log-line';
+    d.innerHTML = `<span class="etag ${cls}">${esc(type)}</span><span>${esc(text)}</span>`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function setActive(prefix, on) {
+    document.getElementById(`${prefix}-dot`).classList.toggle('active', on);
+    document.getElementById(`${prefix}-start`).disabled = on;
+    document.getElementById(`${prefix}-stop` ).disabled = !on;
+    if (prefix === 'chat') document.getElementById('chat-send').disabled = on;
+  }
+
+  function clearLog(id) { document.getElementById(id).innerHTML = ''; }
+
+  // ── 1. Relógio ───────────────────────────────────────────────────────────
+  let clockEs = null;
+
+  function startClock() {
+    clearLog('clock-log');
+    setActive('clock', true);
+
+    // EventSource abre a conexão SSE — o navegador reconecta automaticamente
+    clockEs = new EventSource('/sse/clock');
+
+    // O backend emite eventType:"tick" — o cliente ouve com addEventListener
+    clockEs.addEventListener('tick', e => {
+      // O .NET 10 serializa ClockPayload como JSON — fazemos parse aqui
+      const d = JSON.parse(e.data);
+      document.getElementById('clock-time').textContent = d.time;
+      document.getElementById('clock-date').textContent = d.date;
+      addLog('clock-log', 'tick', `${d.time} — ${d.date}`);
+    });
+
+    clockEs.onerror = () => { addLog('clock-log', 'error', 'stream encerrado'); stopClock(); };
+  }
+
+  function stopClock() {
+    clockEs?.close(); clockEs = null;
+    setActive('clock', false);
+    document.getElementById('clock-date').textContent = 'desconectado';
+  }
+
+  // ── 2. Progresso ─────────────────────────────────────────────────────────
+  let progressEs = null;
+
+  function startProgress() {
+    clearLog('progress-log');
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('progress-pct').textContent  = '0%';
+    document.getElementById('progress-step').textContent = 'Iniciando...';
+    document.getElementById('progress-etype').textContent = '—';
+    setActive('progress', true);
+
+    progressEs = new EventSource('/sse/progress');
+
+    // SseFormatter emite eventType:"progress" e eventType:"complete" por item
+    progressEs.addEventListener('progress', e => applyProgress(JSON.parse(e.data), 'progress'));
+    progressEs.addEventListener('complete', e => {
+      applyProgress(JSON.parse(e.data), 'complete');
+      stopProgress();
+    });
+
+    progressEs.onerror = () => { addLog('progress-log', 'error', 'stream encerrado'); stopProgress(); };
+  }
+
+  function applyProgress(d, type) {
+    document.getElementById('progress-fill').style.width = d.percent + '%';
+    document.getElementById('progress-pct').textContent  = d.percent + '%';
+    document.getElementById('progress-step').textContent = d.message;
+    document.getElementById('progress-etype').textContent = type;
+    addLog('progress-log', type, `${d.percent}% — ${d.message}`);
+  }
+
+  function stopProgress() {
+    progressEs?.close(); progressEs = null;
+    setActive('progress', false);
+  }
+
+  // ── 3. Chat ──────────────────────────────────────────────────────────────
+  let chatEs = null;
+
+  function startChat() {
+    const msg = document.getElementById('chat-input').value.trim() || 'Olá!';
+    clearLog('chat-log');
+    // Limpar bolha — primeiro filho é o placeholder
+    const bubble = document.getElementById('chat-bubble');
+    bubble.textContent = '';
+    setActive('chat', true);
+
+    chatEs = new EventSource(`/sse/chat?message=${encodeURIComponent(msg)}`);
+
+    // SseFormatter escreve strings raw — sem serialização JSON, sem aspas
+    chatEs.addEventListener('token', e => {
+      bubble.textContent += e.data;
+      addLog('chat-log', 'token', `"${e.data.trim()}"`);
+    });
+
+    // Event type "done" separado — mais limpo do que detectar um valor especial no data
+    chatEs.addEventListener('done', () => {
+      addLog('chat-log', 'done', 'stream concluído pelo servidor');
+      stopChat();
+    });
+
+    chatEs.onerror = () => { addLog('chat-log', 'error', 'stream encerrado'); stopChat(); };
+  }
+
+  function stopChat() {
+    chatEs?.close(); chatEs = null;
+    setActive('chat', false);
+    document.getElementById('chat-send').disabled = false;
+  }
+</script>
+
+</body>
+</html>
