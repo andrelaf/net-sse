@@ -295,7 +295,8 @@
     <div class="chat-row">
       <input id="chat-input" type="text" placeholder="Digite sua pergunta..."
              value="O que é SSE no .NET 10?" onkeydown="if(event.key==='Enter')startChat()" />
-      <button class="btn-start" id="chat-send" onclick="startChat()">Enviar</button>
+      <button class="btn-start" id="chat-start" onclick="startChat()">Enviar</button>
+      <button class="btn-stop"  id="chat-stop"  onclick="stopChat()" disabled>Cancelar</button>
     </div>
 
     <div class="chat-bubble" id="chat-bubble">
@@ -330,7 +331,6 @@
     document.getElementById(`${prefix}-dot`).classList.toggle('active', on);
     document.getElementById(`${prefix}-start`).disabled = on;
     document.getElementById(`${prefix}-stop` ).disabled = !on;
-    if (prefix === 'chat') document.getElementById('chat-send').disabled = on;
   }
 
   function clearLog(id) { document.getElementById(id).innerHTML = ''; }
@@ -430,7 +430,6 @@
   function stopChat() {
     chatEs?.close(); chatEs = null;
     setActive('chat', false);
-    document.getElementById('chat-send').disabled = false;
   }
 </script>
 

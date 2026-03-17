@@ -78,7 +78,8 @@ static async IAsyncEnumerable<SseItem<string>> ProgressStream(
     {
         if (ct.IsCancellationRequested) yield break;
 
-        var payload = JsonSerializer.Serialize(new ProgressPayload(i, steps[i / 10]));
+        var payload = JsonSerializer.Serialize(new ProgressPayload(i, steps[i / 10]),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         var isLast  = i == 100;
 
         // SseItem<string> permite definir eventType por evento individualmente
